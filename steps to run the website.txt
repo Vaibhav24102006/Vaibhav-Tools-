@@ -1,0 +1,24 @@
+step 1 = cd 'C:\Users\victus\Desktop\VaibhavTools'
+step 2 = npm start
+step 3 = visit http://localhost:3000
+step 4 = node scripts/init-db.js
+step 5 (optional to download the dependency ) = [ go to the vaibhavtools directory then] npm install
+step 6 ( for backend download) :- 
+✅ Default admin user created
+📧 Email: admin@vaibhavtools.com
+🔑 Password: admin123
+✅ Sample products created
+📊 Setting up database indexes...
+✅ Database initialization completed successfully!
+
+📋 Next Steps:
+1. Start the backend server: node server.js
+2. Start the frontend: npm start
+3. Access admin panel: http://localhost:3000/admin/login
+4. Login with: admin@vaibhavtools.com / admin123
+         🏵️ CRUNCHYROLL 🏵️
+             MEGA FAN 
+
+EMAIL: tmlong14@gmail.com
+
+PASSWORD: Flyguy09

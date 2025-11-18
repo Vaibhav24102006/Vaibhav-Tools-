@@ -1,0 +1,97 @@
+diff --git a/.env b/.env
+index 1234567..abcdefg 100644
+--- a/.env
++++ b/.env
+@@ -1,4 +1,5 @@
+-REACT_APP_EMAILJS_SERVICE_ID=service_l74orya
++# EmailJS Configuration
++REACT_APP_EMAILJS_SERVICE_ID=service_l74orya
+ REACT_APP_EMAILJS_TEMPLATE_ID=template_amj7dsr
+ REACT_APP_EMAILJS_PUBLIC_KEY=9OIsKA0azrLjTtNZy
+ REACT_APP_ADMIN_EMAIL=rahul.jain36463@gmail.com
+
+diff --git a/src/components/OrderForm.jsx b/src/components/OrderForm.jsx
+index 1234567..abcdefg 100644
+--- a/src/components/OrderForm.jsx
++++ b/src/components/OrderForm.jsx
+@@ -1,6 +1,6 @@
+ import React, { useState, useRef } from 'react';
+-import emailjs from '@emailjs/browser';
+ import { motion, AnimatePresence } from 'framer-motion';
++import emailService from '../services/emailService';
+ 
+ const OrderForm = ({ product, onClose }) => {
+   const formRef = useRef();
+@@ -15,10 +15,7 @@ const OrderForm = ({ product, onClose }) => {
+   const [success, setSuccess] = useState(false);
+   const [error, setError] = useState('');
+ 
+-  // TODO: Replace with your actual EmailJS credentials
+-  const serviceID = "service_fbwsprr";
+-  const templateID = "template_3200olk";
+-  const publicKey = "jegnZqreLikRcFBHw";
++  // EmailJS configuration is now centralized in emailService
+ 
+   const handleChange = (e) => {
+     setForm({ ...form, [e.target.name]: e.target.value });
+@@ -31,26 +28,33 @@ const OrderForm = ({ product, onClose }) => {
+     setSuccess(false);
+ 
+     try {
+-      // Enhanced template parameters with product details
+-      const templateParams = {
+-        customer_name: form.customer_name,
+-        customer_email: form.customer_email,
+-        product: form.product,
+-        message: form.message,
+-        order_date: new Date().toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' }),
+-        order_time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+-        product_category: product?.category || 'Unknown',
+-        product_price: product?.price ? `₹${product.price.toFixed(2)}` : 'Price on request',
+-        total_value: product?.price ? `₹${(product.price * form.quantity).toFixed(2)}` : 'Price on request'
++      // Prepare order data for email service
++      const orderId = `ORD-${Date.now()}`;
++      const totalAmount = product?.price ? product.price * form.quantity : 0;
++      
++      const orderData = {
++        orderId,
++        customerName: form.customer_name,
++        customerEmail: form.customer_email,
++        customerAddress: form.message || 'Not provided',
++        items: [{
++          name: form.product,
++          quantity: form.quantity,
++          price: product?.price || 0
++        }],
++        totalAmount,
++        date: new Date().toISOString()
+       };
+ 
+-      await emailjs.send(
+-        serviceID,
+-        templateID,
+-        templateParams,
+-        publicKey
+-      );
+-
+-      setSuccess(true);
++      // Use centralized email service
++      const result = await emailService.sendOrderNotificationToAdmin(orderData);
++      
++      if (result.success) {
++        console.log('✅ Order notification sent successfully');
++        setSuccess(true);
++      } else {
++        throw new Error(result.message || 'Failed to send order notification');
++      }
+       setTimeout(() => {
+         onClose();
+       }, 2000);
+     } catch (error) {
+-      // EmailJS error handled
+-      setError('Failed to process order. Please try again.');
++      console.error('❌ Order form error:', error);
++      setError(`Failed to process order: ${error.message || 'Please try again.'}`);
+     } finally {
+       setLoading(false);
+     }

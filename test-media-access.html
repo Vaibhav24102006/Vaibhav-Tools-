@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Media Files Test - VaibhavTools</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: white;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #333;
+            border-radius: 8px;
+        }
+        .success { border-color: #4CAF50; }
+        .error { border-color: #f44336; }
+        img, video {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .status.success { background: #4CAF50; }
+        .status.error { background: #f44336; }
+    </style>
+</head>
+<body>
+    <h1>🎬 Media Files Test - VaibhavTools</h1>
+    
+    <div class="test-section">
+        <h2>📸 Workshop Image Test</h2>
+        <div id="image-status" class="status">Testing image...</div>
+        <img 
+            id="workshop-image"
+            src="/images/Gemini_Generated_Image_lwt038lwt038lwt0.png"
+            alt="Vaibhav Tools Workshop"
+            style="display: none;"
+            onload="imageLoaded()"
+            onerror="imageError()"
+        />
+    </div>
+
+    <div class="test-section">
+        <h2>🎥 Background Video Test</h2>
+        <div id="video-status" class="status">Testing video...</div>
+        <video 
+            id="background-video"
+            src="/images/video.mp4"
+            controls
+            style="display: none;"
+            onloadeddata="videoLoaded()"
+            onerror="videoError()"
+        >
+            Your browser does not support the video tag.
+        </video>
+    </div>
+
+    <div class="test-section">
+        <h2>📊 File Information</h2>
+        <div id="file-info">
+            <p><strong>Image Path:</strong> /images/Gemini_Generated_Image_lwt038lwt038lwt0.png</p>
+            <p><strong>Video Path:</strong> /images/video.mp4</p>
+            <p><strong>Expected Location:</strong> public/images/</p>
+        </div>
+    </div>
+
+    <script>
+        function imageLoaded() {
+            const status = document.getElementById('image-status');
+            const image = document.getElementById('workshop-image');
+            
+            status.textContent = '✅ Image loaded successfully!';
+            status.className = 'status success';
+            image.style.display = 'block';
+        }
+
+        function imageError() {
+            const status = document.getElementById('image-status');
+            status.textContent = '❌ Image failed to load. Check file path and permissions.';
+            status.className = 'status error';
+        }
+
+        function videoLoaded() {
+            const status = document.getElementById('video-status');
+            const video = document.getElementById('background-video');
+            
+            status.textContent = '✅ Video loaded successfully!';
+            status.className = 'status success';
+            video.style.display = 'block';
+        }
+
+        function videoError() {
+            const status = document.getElementById('video-status');
+            status.textContent = '❌ Video failed to load. Check file path and permissions.';
+            status.className = 'status error';
+        }
+
+        // Test file accessibility
+        async function testFileAccess() {
+            try {
+                const imageResponse = await fetch('/images/Gemini_Generated_Image_lwt038lwt038lwt0.png');
+                const videoResponse = await fetch('/images/video.mp4');
+                
+                console.log('Image response:', imageResponse.status);
+                console.log('Video response:', videoResponse.status);
+                
+                if (imageResponse.ok && videoResponse.ok) {
+                    console.log('✅ All media files are accessible');
+                } else {
+                    console.log('❌ Some media files are not accessible');
+                }
+            } catch (error) {
+                console.error('Error testing file access:', error);
+            }
+        }
+
+        // Run test on page load
+        window.addEventListener('load', testFileAccess);
+    </script>
+</body>
+</html> 

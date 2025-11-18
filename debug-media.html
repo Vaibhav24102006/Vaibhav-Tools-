@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Media Loading - VaibhavTools</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: white;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #333;
+            border-radius: 8px;
+        }
+        .success { border-color: #4CAF50; }
+        .error { border-color: #f44336; }
+        img, video {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .status.success { background: #4CAF50; }
+        .status.error { background: #f44336; }
+        .status.info { background: #2196F3; }
+        .console-log {
+            background: #000;
+            color: #0f0;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Debug Media Loading - VaibhavTools</h1>
+    
+    <div class="test-section">
+        <h2>📸 Workshop Image Test</h2>
+        <div id="image-status" class="status info">Testing image...</div>
+        <img 
+            id="workshop-image"
+            src="/images/Gemini_Generated_Image_lwt038lwt038lwt0.png"
+            alt="Vaibhav Tools Workshop"
+            style="display: none;"
+            onload="imageLoaded()"
+            onerror="imageError()"
+        />
+        <div class="console-log" id="image-console"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>🎥 Background Video Test</h2>
+        <div id="video-status" class="status info">Testing video...</div>
+        <video 
+            id="background-video"
+            src="/images/video.mp4"
+            controls
+            style="display: none;"
+            onloadeddata="videoLoaded()"
+            onerror="videoError()"
+        >
+            Your browser does not support the video tag.
+        </video>
+        <div class="console-log" id="video-console"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>📊 File Information</h2>
+        <div id="file-info">
+            <p><strong>Image Path:</strong> /images/Gemini_Generated_Image_lwt038lwt038lwt0.png</p>
+            <p><strong>Video Path:</strong> /images/video.mp4</p>
+            <p><strong>Expected Location:</strong> public/images/</p>
+            <p><strong>Current URL:</strong> <span id="current-url"></span></p>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>🔧 Network Tests</h2>
+        <button onclick="testNetworkAccess()">Test Network Access</button>
+        <div id="network-results" class="console-log"></div>
+    </div>
+
+    <script>
+        // Log to both console and our debug display
+        function logToElement(elementId, message) {
+            const element = document.getElementById(elementId);
+            const timestamp = new Date().toLocaleTimeString();
+            element.innerHTML += `[${timestamp}] ${message}\n`;
+            console.log(`[${elementId}] ${message}`);
+        }
+
+        function imageLoaded() {
+            const status = document.getElementById('image-status');
+            const image = document.getElementById('workshop-image');
+            
+            status.textContent = '✅ Image loaded successfully!';
+            status.className = 'status success';
+            image.style.display = 'block';
+            
+            logToElement('image-console', 'Image loaded successfully');
+            logToElement('image-console', `Image dimensions: ${image.naturalWidth}x${image.naturalHeight}`);
+        }
+
+        function imageError() {
+            const status = document.getElementById('image-status');
+            status.textContent = '❌ Image failed to load. Check file path and permissions.';
+            status.className = 'status error';
+            
+            logToElement('image-console', 'Image failed to load');
+            logToElement('image-console', 'Error details: Check browser console for more info');
+        }
+
+        function videoLoaded() {
+            const status = document.getElementById('video-status');
+            const video = document.getElementById('background-video');
+            
+            status.textContent = '✅ Video loaded successfully!';
+            status.className = 'status success';
+            video.style.display = 'block';
+            
+            logToElement('video-console', 'Video loaded successfully');
+            logToElement('video-console', `Video duration: ${video.duration}s`);
+        }
+
+        function videoError() {
+            const status = document.getElementById('video-status');
+            status.textContent = '❌ Video failed to load. Check file path and permissions.';
+            status.className = 'status error';
+            
+            logToElement('video-console', 'Video failed to load');
+            logToElement('video-console', 'Error details: Check browser console for more info');
+        }
+
+        async function testNetworkAccess() {
+            const results = document.getElementById('network-results');
+            results.innerHTML = 'Testing network access...\n';
+            
+            try {
+                // Test image access
+                const imageResponse = await fetch('/images/Gemini_Generated_Image_lwt038lwt038lwt0.png');
+                logToElement('network-results', `Image response: ${imageResponse.status} ${imageResponse.statusText}`);
+                
+                // Test video access
+                const videoResponse = await fetch('/images/video.mp4');
+                logToElement('network-results', `Video response: ${videoResponse.status} ${videoResponse.statusText}`);
+                
+                if (imageResponse.ok && videoResponse.ok) {
+                    logToElement('network-results', '✅ All media files are accessible via network');
+                } else {
+                    logToElement('network-results', '❌ Some media files are not accessible via network');
+                }
+                
+                // Test with HEAD request for more details
+                const imageHead = await fetch('/images/Gemini_Generated_Image_lwt038lwt038lwt0.png', { method: 'HEAD' });
+                const videoHead = await fetch('/images/video.mp4', { method: 'HEAD' });
+                
+                logToElement('network-results', `Image content-type: ${imageHead.headers.get('content-type')}`);
+                logToElement('network-results', `Video content-type: ${videoHead.headers.get('content-type')}`);
+                
+            } catch (error) {
+                logToElement('network-results', `❌ Network test failed: ${error.message}`);
+            }
+        }
+
+        // Show current URL
+        document.getElementById('current-url').textContent = window.location.href;
+        
+        // Log initial setup
+        logToElement('image-console', 'Starting image test...');
+        logToElement('video-console', 'Starting video test...');
+        
+        // Test file accessibility on page load
+        window.addEventListener('load', () => {
+            setTimeout(testNetworkAccess, 1000);
+        });
+    </script>
+</body>
+</html> 
