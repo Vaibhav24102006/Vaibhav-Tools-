@@ -1,0 +1,23 @@
+# Bulk Product Import Implementation
+
+- [x] Analyze existing codebase <!-- id: 0 -->
+    - [x] Inspect `package.json` for dependencies <!-- id: 1 -->
+    - [x] Inspect `server.js` for backend structure and DB connection <!-- id: 2 -->
+    - [x] Locate Admin Dashboard components in `src` <!-- id: 3 -->
+    - [x] Locate Product model <!-- id: 4 -->
+- [x] Create Implementation Plan <!-- id: 5 -->
+- [x] Backend Implementation (`server.js`) <!-- id: 6 -->
+    - [x] Install `multer`, `mammoth`, `xlsx`, `cheerio` <!-- id: 7 -->
+    - [x] Configure `multer` for temp uploads <!-- id: 10 -->
+    - [x] Create `POST /api/admin/products/import` route <!-- id: 9 -->
+    - [x] Implement `processFile` helper (Mammoth/XLSX) <!-- id: 11 -->
+    - [x] Implement validation and Firestore batch insert <!-- id: 12 -->
+    - [x] Fix duplicate `jwt` import error <!-- id: 21 -->
+- [x] Frontend Implementation (`src/pages/admin/AdminProducts.jsx`) <!-- id: 13 -->
+    - [x] Create `BulkImportModal` component <!-- id: 14 -->
+    - [x] Add "Import Products" button to header <!-- id: 15 -->
+    - [x] Implement upload logic using `fetch` <!-- id: 16 -->
+    - [x] Handle response and refresh product list <!-- id: 17 -->
+- [x] Verify Implementation <!-- id: 18 -->
+    - [x] Create sample .docx, .xlsx, .csv files <!-- id: 19 -->
+    - [x] Test upload and verification on dashboard <!-- id: 20 -->

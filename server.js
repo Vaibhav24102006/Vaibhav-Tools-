@@ -5,7 +5,16 @@ const socketIo = require('socket.io');
 const admin = require('firebase-admin');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+
+const multer = require('multer');
+const mammoth = require('mammoth');
+const XLSX = require('xlsx');
+const cheerio = require('cheerio');
+const fs = require('fs');
+const path = require('path');
 require('dotenv').config();
+
+const upload = multer({ dest: 'uploads/' });
 
 const app = express();
 const server = http.createServer(app);
@@ -53,13 +62,13 @@ const authenticateToken = (req, res, next) => {
 // Admin Authentication Middleware
 const authenticateAdmin = async (req, res, next) => {
   try {
-    await authenticateToken(req, res, () => {});
-    
+    await authenticateToken(req, res, () => { });
+
     const userDoc = await db.collection('users').doc(req.user.uid).get();
     if (!userDoc.exists || !userDoc.data().isAdmin) {
       return res.status(403).json({ error: 'Admin access required' });
     }
-    
+
     next();
   } catch (error) {
     res.status(403).json({ error: 'Admin authentication failed' });
@@ -72,33 +81,33 @@ const authenticateAdmin = async (req, res, next) => {
 app.post('/api/admin/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    
+
     // Get user from Firestore
     const usersRef = db.collection('users');
     const snapshot = await usersRef.where('email', '==', email).get();
-    
+
     if (snapshot.empty) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
-    
+
     const userDoc = snapshot.docs[0];
     const userData = userDoc.data();
-    
+
     if (!userData.isAdmin) {
       return res.status(403).json({ error: 'Admin access required' });
     }
-    
+
     const validPassword = await bcrypt.compare(password, userData.password);
     if (!validPassword) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
-    
+
     const token = jwt.sign(
       { uid: userDoc.id, email: userData.email, isAdmin: true },
       JWT_SECRET,
       { expiresIn: '24h' }
     );
-    
+
     res.json({
       token,
       user: {
@@ -118,7 +127,7 @@ app.get('/api/products', async (req, res) => {
   try {
     const productsRef = db.collection('products');
     const snapshot = await productsRef.get();
-    
+
     const products = [];
     snapshot.forEach(doc => {
       products.push({
@@ -126,7 +135,7 @@ app.get('/api/products', async (req, res) => {
         ...doc.data()
       });
     });
-    
+
     res.json(products);
   } catch (error) {
     // Get products error handled
@@ -138,26 +147,26 @@ app.get('/api/products', async (req, res) => {
 app.post('/api/admin/products', authenticateAdmin, async (req, res) => {
   try {
     const productData = req.body;
-    
+
     // Validation
     if (!productData.name || !productData.price || !productData.category) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
-    
+
     const docRef = await db.collection('products').add({
       ...productData,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
-    
+
     const newProduct = {
       id: docRef.id,
       ...productData
     };
-    
+
     // Emit real-time update
     io.emit('productAdded', newProduct);
-    
+
     res.status(201).json(newProduct);
   } catch (error) {
     // Add product error handled
@@ -170,20 +179,20 @@ app.put('/api/admin/products/:id', authenticateAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const updateData = req.body;
-    
+
     await db.collection('products').doc(id).update({
       ...updateData,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
-    
+
     const updatedProduct = {
       id,
       ...updateData
     };
-    
+
     // Emit real-time update
     io.emit('productUpdated', updatedProduct);
-    
+
     res.json(updatedProduct);
   } catch (error) {
     // Update product error handled
@@ -195,16 +204,132 @@ app.put('/api/admin/products/:id', authenticateAdmin, async (req, res) => {
 app.delete('/api/admin/products/:id', authenticateAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     await db.collection('products').doc(id).delete();
-    
+
     // Emit real-time update
     io.emit('productDeleted', { id });
-    
+
     res.json({ message: 'Product deleted successfully' });
   } catch (error) {
     // Delete product error handled
     res.status(500).json({ error: 'Failed to delete product' });
+  }
+}
+});
+
+// Admin: Bulk Import Products
+app.post('/api/admin/products/import', authenticateAdmin, upload.single('file'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+
+  const filePath = req.file.path;
+  const ext = path.extname(req.file.originalname).toLowerCase();
+  let products = [];
+
+  try {
+    if (ext === '.docx') {
+      // Parse Word (.docx): convert to HTML then extract table rows
+      const { value: html } = await mammoth.convertToHtml({ path: filePath });
+      const $ = cheerio.load(html);
+      const table = $('table').first();
+      let headers = [];
+
+      table.find('tr').each((i, row) => {
+        if (i === 0) {
+          // Header row: collect column names
+          $(row).find('td, th').each((j, cell) => {
+            headers[j] = $(cell).text().trim().toLowerCase();
+          });
+        } else {
+          // Data rows: build object mapping header->cell text
+          const rowData = {};
+          $(row).find('td').each((j, cell) => {
+            // Map header to value, fallbacks for missing headers are handled in normalization
+            const key = headers[j];
+            if (key) {
+              rowData[key] = $(cell).text().trim();
+            }
+          });
+          if (Object.keys(rowData).length > 0) {
+            products.push(rowData);
+          }
+        }
+      });
+    } else if (ext === '.xlsx' || ext === '.xls' || ext === '.csv') {
+      // Parse Excel (.xlsx) or CSV
+      // For CSV, SheetJS handles it automatically via readFile if extension is correct
+      const workbook = XLSX.readFile(filePath);
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      products = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+    } else {
+      return res.status(400).json({ error: 'Unsupported file type' });
+    }
+
+    // Insert products into Firestore with validation
+    let successCount = 0;
+    let errors = [];
+
+    for (let i = 0; i < products.length; i++) {
+      const prod = products[i];
+
+      // Normalize field names (handle variations in capitalization from file headers)
+      // We look for keys that match our expected fields case-insensitively
+      const getField = (obj, ...candidates) => {
+        const keys = Object.keys(obj);
+        for (const candidate of candidates) {
+          const match = keys.find(k => k.toLowerCase() === candidate.toLowerCase());
+          if (match) return obj[match];
+        }
+        return undefined;
+      };
+
+      const name = getField(prod, 'name', 'product name', 'productname');
+      const category = getField(prod, 'category', 'cat');
+      const brand = getField(prod, 'brand', 'manufacturer');
+      const description = getField(prod, 'description', 'desc');
+
+      // Parse numbers
+      const priceRaw = getField(prod, 'price', 'cost', 'mrp');
+      const stockRaw = getField(prod, 'stock', 'instock', 'quantity', 'qty');
+
+      const price = parseFloat(typeof priceRaw === 'string' ? priceRaw.replace(/[^0-9.]/g, '') : priceRaw);
+      const inStock = parseInt(stockRaw, 10) || 0;
+
+      // Strict validation as requested
+      if (!name || !category || !brand || isNaN(price)) {
+        errors.push(`Row ${i + 1}: Missing required fields (Name, Category, Brand, Price)`);
+        continue;
+      }
+
+      const productData = {
+        name,
+        category,
+        brand,
+        description: description || '',
+        price,
+        inStock,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      };
+
+      // Add to Firestore
+      await db.collection('products').add(productData);
+      successCount++;
+    }
+
+    res.json({ successCount, errors });
+  } catch (err) {
+    console.error('Import error:', err);
+    res.status(500).json({ error: err.message });
+  } finally {
+    // Clean up temp file
+    if (fs.existsSync(filePath)) {
+      try {
+        fs.unlinkSync(filePath);
+      } catch (e) {
+        console.error('Error deleting temp file:', e);
+      }
+    }
   }
 });
 
@@ -213,7 +338,7 @@ app.get('/api/admin/orders', authenticateAdmin, async (req, res) => {
   try {
     const ordersRef = db.collection('orders');
     const snapshot = await ordersRef.orderBy('createdAt', 'desc').get();
-    
+
     const orders = [];
     snapshot.forEach(doc => {
       orders.push({
@@ -221,7 +346,7 @@ app.get('/api/admin/orders', authenticateAdmin, async (req, res) => {
         ...doc.data()
       });
     });
-    
+
     res.json(orders);
   } catch (error) {
     // Get orders error handled
@@ -234,20 +359,20 @@ app.put('/api/admin/orders/:id/status', authenticateAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
-    
+
     const validStatuses = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ error: 'Invalid status' });
     }
-    
+
     await db.collection('orders').doc(id).update({
       status,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
-    
+
     // Emit real-time update
     io.emit('orderStatusUpdated', { id, status });
-    
+
     res.json({ message: 'Order status updated successfully' });
   } catch (error) {
     // Update order status error handled
@@ -259,28 +384,28 @@ app.put('/api/admin/orders/:id/status', authenticateAdmin, async (req, res) => {
 app.post('/api/orders', async (req, res) => {
   try {
     const orderData = req.body;
-    
+
     // Validation
     if (!orderData.items || orderData.items.length === 0) {
       return res.status(400).json({ error: 'Order must contain items' });
     }
-    
+
     const orderRef = await db.collection('orders').add({
       ...orderData,
       status: 'pending',
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
-    
+
     const newOrder = {
       id: orderRef.id,
       ...orderData,
       status: 'pending'
     };
-    
+
     // Emit real-time update to admin
     io.emit('newOrder', newOrder);
-    
+
     res.status(201).json(newOrder);
   } catch (error) {
     // Create order error handled
@@ -293,13 +418,13 @@ app.get('/api/admin/dashboard', authenticateAdmin, async (req, res) => {
   try {
     const productsSnapshot = await db.collection('products').get();
     const ordersSnapshot = await db.collection('orders').get();
-    
+
     const totalProducts = productsSnapshot.size;
     const totalOrders = ordersSnapshot.size;
-    
+
     let totalRevenue = 0;
     let pendingOrders = 0;
-    
+
     ordersSnapshot.forEach(doc => {
       const order = doc.data();
       totalRevenue += order.total || 0;
@@ -307,7 +432,7 @@ app.get('/api/admin/dashboard', authenticateAdmin, async (req, res) => {
         pendingOrders++;
       }
     });
-    
+
     res.json({
       totalProducts,
       totalOrders,
@@ -322,8 +447,8 @@ app.get('/api/admin/dashboard', authenticateAdmin, async (req, res) => {
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
+  res.json({
+    status: 'ok',
     timestamp: new Date().toISOString(),
     message: 'Vaibhav Tools API is running'
   });
@@ -332,7 +457,7 @@ app.get('/api/health', (req, res) => {
 // Socket.IO connection handling
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
-  
+
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.id);
   });

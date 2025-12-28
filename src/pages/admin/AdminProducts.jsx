@@ -4,7 +4,9 @@ import { Plus, Search, Filter } from 'lucide-react';
 import AdminSidebar from '../../components/admin/AdminSidebar';
 import ProductTable from '../../components/admin/ProductTable';
 import ProductForm from '../../components/admin/ProductForm';
+import BulkImportModal from '../../components/admin/BulkImportModal';
 import adminFirestore from '../../utils/adminFirestore';
+import { Upload } from 'lucide-react';
 
 const AdminProducts = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -12,6 +14,7 @@ const AdminProducts = () => {
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
@@ -123,7 +126,7 @@ const AdminProducts = () => {
     <div className="min-h-screen bg-black pt-20">
       <div className="flex">
         <AdminSidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
-        
+
         <main className="flex-1 p-6 lg:p-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -138,6 +141,13 @@ const AdminProducts = () => {
                   Manage your product inventory ({filteredProducts.length} of {products.length})
                 </p>
               </div>
+              <button
+                onClick={() => setShowImportModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition-colors mr-2 border border-gray-700"
+              >
+                <Upload size={20} />
+                Import
+              </button>
               <button
                 onClick={handleAddProduct}
                 className="flex items-center gap-2 px-4 py-2 bg-primary-red hover:bg-red-700 text-white rounded-lg transition-colors"
@@ -229,6 +239,16 @@ const AdminProducts = () => {
           onSave={handleFormSave}
         />
       )}
+
+      {/* Bulk Import Modal */}
+      <BulkImportModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onSuccess={() => {
+          loadProducts();
+          loadFilters();
+        }}
+      />
     </div>
   );
 };
