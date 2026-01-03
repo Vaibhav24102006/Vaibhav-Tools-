@@ -5,6 +5,7 @@ const socketIo = require('socket.io');
 const admin = require('firebase-admin');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 
 const multer = require('multer');
 const mammoth = require('mammoth');
@@ -30,7 +31,24 @@ app.use(cors());
 app.use(express.json());
 
 // Initialize Firebase Admin
-const serviceAccount = require('./firebase-service-account.json');
+let serviceAccount;
+try {
+  // prefer a local file for dev
+  serviceAccount = require('./firebase-service-account.json');
+} catch (err) {
+  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+  } else {
+    // fallback to existing serviceAccountKey.json
+    try {
+      serviceAccount = require('./serviceAccountKey.json');
+    } catch (fallbackErr) {
+      console.error('Firebase service account not found. Provide ./firebase-service-account.json, ./serviceAccountKey.json, or FIREBASE_SERVICE_ACCOUNT env var.');
+      process.exit(1);
+    }
+  }
+}
+
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
   databaseURL: "https://vaibhav-tools-default-rtdb.firebaseio.com"
@@ -43,35 +61,67 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
 // Authentication Middleware
 const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+  const authHeader = req.headers.authorization;
 
-  if (!token) {
-    return res.status(401).json({ error: 'Access token required' });
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    if (!res.headersSent) {
+      res.status(401).json({ error: "Missing or malformed token" });
+    }
+    return;
   }
 
-  jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) {
-      return res.status(403).json({ error: 'Invalid token' });
-    }
-    req.user = user;
+  const token = authHeader.split(" ")[1];
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = decoded;
     next();
-  });
+  } catch (err) {
+    if (!res.headersSent) {
+      res.status(401).json({ error: "Invalid token" });
+    }
+  }
 };
 
 // Admin Authentication Middleware
 const authenticateAdmin = async (req, res, next) => {
   try {
-    await authenticateToken(req, res, () => { });
+    // First verify the JWT token
+    const authHeader = req.headers.authorization;
 
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      if (!res.headersSent) {
+        res.status(401).json({ error: "Missing or malformed token" });
+      }
+      return;
+    }
+
+    const token = authHeader.split(" ")[1];
+
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET);
+      req.user = decoded;
+    } catch (err) {
+      if (!res.headersSent) {
+        res.status(401).json({ error: "Invalid token" });
+      }
+      return;
+    }
+
+    // Then check admin status
     const userDoc = await db.collection('users').doc(req.user.uid).get();
     if (!userDoc.exists || !userDoc.data().isAdmin) {
-      return res.status(403).json({ error: 'Admin access required' });
+      if (!res.headersSent) {
+        res.status(403).json({ error: 'Admin access required' });
+      }
+      return;
     }
 
     next();
   } catch (error) {
-    res.status(403).json({ error: 'Admin authentication failed' });
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Admin authentication failed' });
+    }
   }
 };
 
@@ -200,6 +250,70 @@ app.put('/api/admin/products/:id', authenticateAdmin, async (req, res) => {
   }
 });
 
+// Password reset endpoints for admin users (mirror behavior in VaibhavTools/server.js)
+// Request password reset - generates a one-time token (dev: returns link in response and logs it)
+app.post('/api/admin/request-password-reset', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email required' });
+
+    const usersRef = db.collection('users');
+    const snapshot = await usersRef.where('email', '==', email).get();
+    if (snapshot.empty) return res.status(404).json({ error: 'No user found with that email' });
+
+    const userDoc = snapshot.docs[0];
+    const userData = userDoc.data();
+    if (!userData.isAdmin) return res.status(403).json({ error: 'Admin account required' });
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const expiry = Date.now() + (60 * 60 * 1000); // 1 hour
+
+    await usersRef.doc(userDoc.id).update({ resetTokenHash: tokenHash, resetTokenExpiry: expiry });
+
+    const frontend = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const resetLink = `${frontend}/admin/reset-password?token=${token}&id=${userDoc.id}`;
+
+    console.log('Password reset link for', email, resetLink);
+
+    res.json({ message: 'Password reset link generated', resetLink });
+  } catch (err) {
+    console.error('request-password-reset error:', err);
+    res.status(500).json({ error: 'Failed to generate reset link' });
+  }
+});
+
+// Reset password - validate token and set new bcrypt-hashed password
+app.post('/api/admin/reset-password', async (req, res) => {
+  try {
+    const { id, token, newPassword } = req.body;
+    if (!id || !token || !newPassword) return res.status(400).json({ error: 'id, token and newPassword are required' });
+
+    const userRef = db.collection('users').doc(id);
+    const userDoc = await userRef.get();
+    if (!userDoc.exists) return res.status(404).json({ error: 'User not found' });
+
+    const data = userDoc.data();
+    if (!data.resetTokenHash || !data.resetTokenExpiry) return res.status(400).json({ error: 'No reset requested' });
+    if (Date.now() > data.resetTokenExpiry) return res.status(400).json({ error: 'Reset token expired' });
+
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    if (tokenHash !== data.resetTokenHash) return res.status(400).json({ error: 'Invalid reset token' });
+
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await userRef.update({ password: hashed, resetTokenHash: admin.firestore.FieldValue.delete(), resetTokenExpiry: admin.firestore.FieldValue.delete(), passwordChangedAt: Math.floor(Date.now() / 1000) });
+
+    if (data.uid) {
+      try { await admin.auth().revokeRefreshTokens(data.uid); } catch (err) { /* ignore */ }
+    }
+
+    res.json({ message: 'Password has been reset successfully' });
+  } catch (err) {
+    console.error('reset-password error:', err);
+    res.status(500).json({ error: 'Failed to reset password' });
+  }
+});
+
 // Admin: Delete Product
 app.delete('/api/admin/products/:id', authenticateAdmin, async (req, res) => {
   try {
@@ -215,7 +329,7 @@ app.delete('/api/admin/products/:id', authenticateAdmin, async (req, res) => {
     // Delete product error handled
     res.status(500).json({ error: 'Failed to delete product' });
   }
-}
+
 });
 
 // Admin: Bulk Import Products
@@ -463,7 +577,7 @@ io.on('connection', (socket) => {
   });
 });
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5050;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 }); 

@@ -258,6 +258,21 @@ All admin routes require authentication and admin claim:
 - Visual progress bar showing in-stock vs out-of-stock ratio
 - Real-time updates from Firestore
 
+---
+
+## Admin Password Reset Flow
+
+We provide a built-in password-reset flow for admin accounts.
+
+1. Request a reset: POST /api/admin/request-password-reset with JSON { email }
+  - The endpoint will verify the email is for an admin user, create a one-time token (1 hour expiry), store a hashed token in Firestore, and (in development) return and log a reset link.
+2. Reset password: POST /api/admin/reset-password with JSON { id, token, newPassword }
+  - The endpoint validates the one-time token, sets a bcrypt-hashed password in Firestore, deletes the token, and sets `passwordChangedAt` to invalidate older JWTs.
+
+Notes:
+- In production, the reset link should be emailed to the admin address (implement email sending via your preferred provider).
+- After a password change, existing sessions are revoked for linked Firebase Auth accounts and tokens issued before `passwordChangedAt` are rejected.
+
 **Category Distribution:**
 - Horizontal bar chart showing product distribution by category
 - Top 6 categories displayed

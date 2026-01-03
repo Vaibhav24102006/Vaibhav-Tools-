@@ -60,11 +60,94 @@ const authenticateAdmin = async (req, res, next) => {
       return res.status(403).json({ error: 'Admin access required' });
     }
     
+    // Reject token if issued before password change
+    const passwordChangedAt = userDoc.data().passwordChangedAt; // seconds
+    if (passwordChangedAt) {
+      const tokenIat = req.user.iat; // seconds
+      if (tokenIat && tokenIat < passwordChangedAt) {
+        return res.status(401).json({ error: 'Credentials have changed. Please sign in again.' });
+      }
+    }
     next();
   } catch (error) {
     res.status(403).json({ error: 'Admin authentication failed' });
   }
 };
+
+// Password reset endpoints for admin users
+const crypto = require('crypto');
+
+// Request password reset - generates a one-time token (dev: returns link in response and logs it)
+app.post('/api/admin/request-password-reset', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email required' });
+
+    const usersRef = db.collection('users');
+    const snapshot = await usersRef.where('email', '==', email).get();
+    if (snapshot.empty) return res.status(404).json({ error: 'No user found with that email' });
+
+    // For security, we only allow admin resets via this route
+    const userDoc = snapshot.docs[0];
+    const userData = userDoc.data();
+    if (!userData.isAdmin) return res.status(403).json({ error: 'Admin account required' });
+
+    // Create secure token
+    const token = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const expiry = Date.now() + (60 * 60 * 1000); // 1 hour
+
+    await usersRef.doc(userDoc.id).update({ resetTokenHash: tokenHash, resetTokenExpiry: expiry });
+
+    const frontend = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const resetLink = `${frontend}/admin/reset-password?token=${token}&id=${userDoc.id}`;
+
+    // In production: send resetLink via email. For now, return it in response and log.
+    console.log('Password reset link for', email, resetLink);
+
+    res.json({ message: 'Password reset link generated', resetLink });
+  } catch (err) {
+    console.error('request-password-reset error:', err);
+    res.status(500).json({ error: 'Failed to generate reset link' });
+  }
+});
+
+// Reset password - validate token and set new bcrypt-hashed password
+app.post('/api/admin/reset-password', async (req, res) => {
+  try {
+    const { id, token, newPassword } = req.body;
+    if (!id || !token || !newPassword) return res.status(400).json({ error: 'id, token and newPassword are required' });
+
+    const userRef = db.collection('users').doc(id);
+    const userDoc = await userRef.get();
+    if (!userDoc.exists) return res.status(404).json({ error: 'User not found' });
+
+    const data = userDoc.data();
+    if (!data.resetTokenHash || !data.resetTokenExpiry) return res.status(400).json({ error: 'No reset requested' });
+    if (Date.now() > data.resetTokenExpiry) return res.status(400).json({ error: 'Reset token expired' });
+
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    if (tokenHash !== data.resetTokenHash) return res.status(400).json({ error: 'Invalid reset token' });
+
+    // Set new password
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await userRef.update({ password: hashed, resetTokenHash: admin.firestore.FieldValue.delete(), resetTokenExpiry: admin.firestore.FieldValue.delete(), passwordChangedAt: Math.floor(Date.now() / 1000) });
+
+    // Optionally revoke sessions for any linked Auth uid
+    if (data.uid) {
+      try {
+        await admin.auth().revokeRefreshTokens(data.uid);
+      } catch (err) {
+        // ignore
+      }
+    }
+
+    res.json({ message: 'Password has been reset successfully' });
+  } catch (err) {
+    console.error('reset-password error:', err);
+    res.status(500).json({ error: 'Failed to reset password' });
+  }
+});
 
 // Routes
 
@@ -188,6 +271,35 @@ app.put('/api/admin/products/:id', authenticateAdmin, async (req, res) => {
   } catch (error) {
     console.error('Update product error:', error);
     res.status(500).json({ error: 'Failed to update product' });
+  }
+});
+
+// Admin: Change Password (authenticated)
+app.post('/api/admin/change-password', authenticateAdmin, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) return res.status(400).json({ error: 'currentPassword and newPassword required' });
+
+    const userRef = db.collection('users').doc(req.user.uid);
+    const userDoc = await userRef.get();
+    if (!userDoc.exists) return res.status(404).json({ error: 'User not found' });
+
+    const data = userDoc.data();
+    const valid = await bcrypt.compare(currentPassword, data.password);
+    if (!valid) return res.status(401).json({ error: 'Current password is incorrect' });
+
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await userRef.update({ password: hashed, passwordChangedAt: Math.floor(Date.now() / 1000), updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+
+    // Revoke linked Auth sessions if any
+    if (data.uid) {
+      try { await admin.auth().revokeRefreshTokens(data.uid); } catch (err) { /* ignore */ }
+    }
+
+    res.json({ message: 'Password changed successfully' });
+  } catch (err) {
+    console.error('change-password error:', err);
+    res.status(500).json({ error: 'Failed to change password' });
   }
 });
 

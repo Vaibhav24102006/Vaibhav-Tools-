@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Upload, FileText, AlertCircle, CheckCircle } from 'lucide-react';
-import { auth } from '../../firebase';
 
 const BulkImportModal = ({ isOpen, onClose, onSuccess }) => {
     const [file, setFile] = useState(null);
@@ -28,18 +27,18 @@ const BulkImportModal = ({ isOpen, onClose, onSuccess }) => {
         setError(null);
 
         try {
-            // Get the current user's ID token for authentication
-            const user = auth.currentUser;
-            if (!user) {
-                throw new Error('User not authenticated');
+            // Get the JWT token from localStorage (set by admin login)
+            const token = localStorage.getItem("token");
+            
+            if (!token) {
+                throw new Error('User not authenticated. Please login again.');
             }
-            const token = await user.getIdToken();
 
             const formData = new FormData();
             formData.append('file', file);
 
             // Use the correct API endpoint
-            const response = await fetch('http://localhost:5000/api/admin/products/import', {
+            const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5050'}/api/admin/products/import`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`

@@ -1,9 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { auth, googleProvider } from '../firebase';
-import { signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
-import { getIdTokenResult } from 'firebase/auth';
 
 const AdminLogin = () => {
   const navigate = useNavigate();
@@ -13,21 +10,11 @@ const AdminLogin = () => {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    // Check if already logged in as admin
-    const checkAuth = async () => {
-      const user = auth.currentUser;
-      if (user) {
-        try {
-          const token = await getIdTokenResult(user, true);
-          if (token.claims && token.claims.admin) {
-            navigate('/admin');
-          }
-        } catch (e) {
-          console.error('Auth check error:', e);
-        }
-      }
-    };
-    checkAuth();
+    // Check if already logged in (has JWT token)
+    const token = localStorage.getItem("token");
+    if (token) {
+      navigate('/admin');
+    }
   }, [navigate]);
 
   const handleLogin = async (e) => {
@@ -36,90 +23,30 @@ const AdminLogin = () => {
     setLoading(true);
 
     try {
-      // Sign in with Firebase Auth
+      // Sign in with backend API
       console.log('Attempting login with:', email);
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-      console.log('Login successful, user ID:', user.uid);
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5050'}/api/admin/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
 
-      // Check if user has admin claim
-      const token = await getIdTokenResult(user, true);
-      console.log('Token claims:', token.claims);
-      console.log('Has admin claim:', token.claims.admin);
-      
-      if (token.claims && token.claims.admin) {
-        // User is admin, redirect to admin panel
-        console.log('Admin verified, redirecting...');
-        navigate('/admin');
-      } else {
-        // User is not admin
-        console.log('User is not admin');
-        setError('Access denied. Admin privileges required.');
-        await auth.signOut();
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Login failed');
       }
+
+      // Save JWT token to localStorage
+      localStorage.setItem('token', data.token);
+      console.log('Login successful, redirecting...');
+      navigate('/admin');
+      
     } catch (error) {
       console.error('Login error:', error);
-      
-      // Handle specific error codes
-      switch (error.code) {
-        case 'auth/invalid-email':
-          setError('Invalid email address');
-          break;
-        case 'auth/user-disabled':
-          setError('This account has been disabled');
-          break;
-        case 'auth/user-not-found':
-          setError('No account found with this email');
-          break;
-        case 'auth/wrong-password':
-          setError('Incorrect password');
-          break;
-        case 'auth/invalid-credential':
-          setError('Invalid email or password');
-          break;
-        default:
-          setError('Login failed. Please try again.');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleGoogleLogin = async () => {
-    setError('');
-    setLoading(true);
-
-    try {
-      console.log('Attempting Google login...');
-      const result = await signInWithPopup(auth, googleProvider);
-      const user = result.user;
-      console.log('Google login successful, user ID:', user.uid);
-
-      // Check if user has admin claim
-      const token = await getIdTokenResult(user, true);
-      console.log('Token claims:', token.claims);
-      console.log('Has admin claim:', token.claims.admin);
-      
-      if (token.claims && token.claims.admin) {
-        // User is admin, redirect to admin panel
-        console.log('Admin verified, redirecting...');
-        navigate('/admin');
-      } else {
-        // User is not admin
-        console.log('User is not admin');
-        setError('Access denied. Admin privileges required.');
-        await auth.signOut();
-      }
-    } catch (error) {
-      console.error('Google login error:', error);
-      
-      if (error.code === 'auth/popup-closed-by-user') {
-        setError('Sign-in cancelled');
-      } else if (error.code === 'auth/popup-blocked') {
-        setError('Popup blocked. Please allow popups for this site.');
-      } else {
-        setError('Google sign-in failed. Please try again.');
-      }
+      setError(error.message || 'Login failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -223,44 +150,6 @@ const AdminLogin = () => {
             </button>
           </form>
 
-          {/* Divider */}
-          <div className="mt-6 mb-6 flex items-center">
-            <div className="flex-1 border-t border-gray-600"></div>
-            <span className="px-4 text-gray-400 text-sm">OR</span>
-            <div className="flex-1 border-t border-gray-600"></div>
-          </div>
-
-          {/* Google Sign-In Button */}
-          <button
-            onClick={handleGoogleLogin}
-            disabled={loading}
-            className={`w-full py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-3 ${
-              loading
-                ? 'bg-gray-600 cursor-not-allowed text-gray-400'
-                : 'bg-white hover:bg-gray-100 text-gray-900 shadow-lg'
-            }`}
-          >
-            <svg className="w-5 h-5" viewBox="0 0 24 24">
-              <path
-                fill="#4285F4"
-                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-              />
-              <path
-                fill="#34A853"
-                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-              />
-              <path
-                fill="#FBBC05"
-                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-              />
-              <path
-                fill="#EA4335"
-                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-              />
-            </svg>
-            Sign in with Google
-          </button>
-
           {/* Info Box */}
           <div className="mt-8 p-4 bg-blue-500/10 border border-blue-500 rounded-lg">
             <p className="text-blue-400 text-sm text-center">
@@ -270,26 +159,22 @@ const AdminLogin = () => {
 
           {/* Back to Home */}
           <div className="mt-6 text-center">
-            <button
-              onClick={() => navigate('/')}
-              className="text-gray-400 hover:text-white transition-colors text-sm"
-            >
-              ← Back to Home
-            </button>
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => navigate('/')}
+                className="text-gray-400 hover:text-white transition-colors text-sm"
+              >
+                ← Back to Home
+              </button>
+              <button
+                onClick={() => navigate('/admin/request-reset')}
+                className="text-sm text-primary-red hover:underline"
+              >
+                Forgot password?
+              </button>
+            </div>
           </div>
         </div>
-
-        {/* Setup Instructions */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.3 }}
-          className="mt-6 p-4 bg-gray-800/50 border border-gray-700 rounded-lg"
-        >
-          <p className="text-gray-400 text-xs text-center">
-            To set up admin access, use Firebase Console to add custom claims to your user account.
-          </p>
-        </motion.div>
       </motion.div>
     </div>
   );

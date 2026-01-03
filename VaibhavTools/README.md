@@ -54,6 +54,8 @@ PORT=5000
 - **Email**: admin@vaibhavtools.com
 - **Password**: admin123
 
+Note: Default credentials are only for initial local development. Use the admin password reset flow documented in `ADMIN_DASHBOARD_SETUP_GUIDE.md` to securely reset or create admin accounts in production.
+
 ## 🛠️ Troubleshooting
 
 ### "Failed to fetch" Network Errors

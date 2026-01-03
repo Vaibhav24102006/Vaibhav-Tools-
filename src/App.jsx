@@ -24,6 +24,8 @@ import TermsOfService from './pages/policies/TermsOfService';
 import TranslationButton from './components/TranslationButton';
 import Admin from './pages/Admin';
 import AdminLogin from './pages/AdminLogin';
+import AdminRequestReset from './pages/AdminRequestReset';
+import AdminResetPassword from './pages/AdminResetPassword';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminProducts from './pages/admin/AdminProducts';
 import AdminCategories from './pages/admin/AdminCategories';
@@ -130,6 +132,8 @@ function App() {
                     </ProtectedRoute>
                   } 
                 />
+                <Route path="/admin/request-reset" element={<AdminRequestReset />} />
+                <Route path="/admin/reset-password" element={<AdminResetPassword />} />
                 {process.env.NODE_ENV !== 'production' && (
                   <Route path="/debug-db" element={<DebugDB />} />
                 )}

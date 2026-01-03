@@ -51,6 +51,53 @@ const Profile = () => {
     }
   };
 
+  const ChangePasswordForm = () => {
+    const [currentPassword, setCurrentPassword] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [cpLoading, setCpLoading] = useState(false);
+    const [cpMessage, setCpMessage] = useState('');
+
+    const handleChangePassword = async (e) => {
+      e.preventDefault();
+      setCpMessage('');
+      if (newPassword.length < 8) return setCpMessage('New password must be at least 8 characters');
+      if (newPassword !== confirmPassword) return setCpMessage('Passwords do not match');
+      setCpLoading(true);
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch('/api/admin/change-password', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ currentPassword, newPassword })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to change password');
+        setCpMessage('Password changed successfully. Please sign in again.');
+        // Clear admin JWT and redirect to admin login
+        localStorage.removeItem('token');
+        setTimeout(() => { window.location.href = '/admin-login'; }, 1500);
+      } catch (err) {
+        setCpMessage(err.message);
+      } finally {
+        setCpLoading(false);
+      }
+    };
+
+    return (
+      <form onSubmit={handleChangePassword} className="space-y-3">
+        <input type="password" placeholder="Current password" className="w-full px-3 py-2 border rounded" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} required />
+        <input type="password" placeholder="New password" className="w-full px-3 py-2 border rounded" value={newPassword} onChange={e => setNewPassword(e.target.value)} required />
+        <input type="password" placeholder="Confirm new password" className="w-full px-3 py-2 border rounded" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required />
+        <button className="bg-primary-red text-white px-4 py-2 rounded" disabled={cpLoading}>{cpLoading ? 'Updating...' : 'Change Password'}</button>
+        {cpMessage && <p className="text-sm text-red-600">{cpMessage}</p>}
+      </form>
+    );
+  };
+
   const handleLogout = async () => {
     setError('');
     setSuccess('');
@@ -484,14 +531,14 @@ const Profile = () => {
                 <div className="bg-gray-50 rounded-lg p-6">
                   <h3 className="text-lg font-medium text-gray-900 mb-4">Security</h3>
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between">
+                    <div className="mb-4">
                       <div>
                         <p className="font-medium text-gray-900">Change Password</p>
                         <p className="text-sm text-gray-600">Update your password for better security</p>
                       </div>
-                      <button className="bg-gray-300 text-gray-700 px-4 py-2 rounded-lg cursor-not-allowed" disabled>
-                        <KeyIcon className="h-4 w-4" />
-                      </button>
+                      <div className="mt-3">
+                        <ChangePasswordForm />
+                      </div>
                     </div>
                     <div className="flex items-center justify-between">
                       <div>
