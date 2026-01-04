@@ -69,24 +69,16 @@ const Contact = () => {
       color: 'text-red-600'
     },
     {
-      icon: FaPhone,
-      title: t('Phone'),
-      content: '9219636463',
-      link: 'tel:+919219636463',
-      color: 'text-green-600'
-    },
-    {
       icon: FaEnvelope,
       title: t('Email'),
-      content: 'vaibhavtools.36463@gmail.com',
-      link: 'mailto:vaibhavtools.36463@gmail.com',
+      content: 'contact@hackiware.org',
+      link: 'mailto:contact@hackiware.org',
       color: 'text-blue-600'
     },
     {
       icon: FaMapMarkerAlt,
-      title: t('Address'),
-      content: '32/91 Chippitola, in front of District Hospital, Agra',
-      link: 'https://maps.app.goo.gl/ZTqkoGFCf9N1JVro7',
+      title: t('Location'),
+      content: 'India (National Outreach)',
       color: 'text-purple-600'
     }
   ];
@@ -151,7 +143,7 @@ const Contact = () => {
                 }}
                 onError={handleVideoError}
                 onLoadedData={handleVideoLoad}
-                aria-label="Vaibhav Tools product showcase video background"
+                aria-label="Hackiware product showcase video background"
                 preload="metadata"
               >
                 <source src="/videos/Vaibhav_Tools_Product_Showcase_Video.mp4" type="video/mp4" />
@@ -189,7 +181,7 @@ const Contact = () => {
                   {t("Get in Touch")}
                 </p>
                 <p className="text-gray-500 text-sm mt-2">
-                  {t("Connect with Vaibhav Tools")}
+                  Connect with Hackiware
                 </p>
               </div>
             </motion.div>
@@ -216,7 +208,7 @@ const Contact = () => {
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.8 }}
           >
-            <span className="text-red-600" style={{ color: '#a00000' }}>{t("Get in Touch")}</span>
+            <span className="text-red-600" style={{ color: '#a00000' }}>Get in Touch with Hackiware</span>
           </motion.h1>
           
           <motion.p 
@@ -229,7 +221,9 @@ const Contact = () => {
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.8, delay: 0.2 }}
           >
-            {t("Have questions about our products? Need technical support? We're here to help you find the perfect tools for your needs.")}
+              Whether you’re an institution, organization, or cybersecurity enthusiast, we’d love to collaborate.
+
+              Reach out to us for workshops, events, partnerships, or community initiatives.
           </motion.p>
           
           <motion.div
@@ -249,7 +243,7 @@ const Contact = () => {
                        focus:ring-red-600/50 active:transform active:scale-95"
               style={{ backgroundColor: '#a00000' }}
             >
-              {t("Contact Us")}
+              Contact Hackiware
             </motion.a>
           </motion.div>
         </div>
