@@ -352,13 +352,12 @@ app.post('/api/admin/products/import', authenticateAdmin, upload.single('file'),
         if (i === 0) {
           // Header row: collect column names
           $(row).find('td, th').each((j, cell) => {
-            headers[j] = $(cell).text().trim().toLowerCase();
+            headers[j] = $(cell).text().trim();
           });
         } else {
           // Data rows: build object mapping header->cell text
           const rowData = {};
           $(row).find('td').each((j, cell) => {
-            // Map header to value, fallbacks for missing headers are handled in normalization
             const key = headers[j];
             if (key) {
               rowData[key] = $(cell).text().trim();
@@ -371,7 +370,7 @@ app.post('/api/admin/products/import', authenticateAdmin, upload.single('file'),
       });
     } else if (ext === '.xlsx' || ext === '.xls' || ext === '.csv') {
       // Parse Excel (.xlsx) or CSV
-      // For CSV, SheetJS handles it automatically via readFile if extension is correct
+      // SheetJS (XLSX) handles most complexity. defval: '' ensures we get empty strings for empty cells.
       const workbook = XLSX.readFile(filePath);
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
       products = XLSX.utils.sheet_to_json(sheet, { defval: '' });
@@ -379,106 +378,136 @@ app.post('/api/admin/products/import', authenticateAdmin, upload.single('file'),
       return res.status(400).json({ error: 'Unsupported file type' });
     }
 
-    // Insert products into Firestore with validation
-    let successCount = 0;
+    let insertedCount = 0;
+    let skippedCount = 0;
     let errors = [];
 
-    // Helper: normalize header keys so we can match variations (case, whitespace, BOM, punctuation)
-    const normalizeKey = (k = '') => {
+    // Helper: Normalize header keys (trim, lowercase, remove special chars)
+    const normalizeKey = (k) => {
       if (typeof k !== 'string') return '';
-      // Remove BOM, trim, lowercase, collapse whitespace and non-alphanum
+      // Remove BOM, trim, lowercase, keep only alphanumeric
       return k.replace(/^\uFEFF/, '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
     };
 
     for (let i = 0; i < products.length; i++) {
-      const prod = products[i];
+      const row = products[i];
+      const rowNumber = i + 1;
 
-      // Build normalized map for quick, tolerant lookups
-      const norm = {};
-      Object.keys(prod || {}).forEach((origKey) => {
-        const v = prod[origKey];
-        const nk = normalizeKey(origKey);
-        if (nk) norm[nk] = v;
+      // 1. Create Normalized Key Map for the Row
+      // This allows us to find 'Price' even if the CSV has 'Price  ' or 'price ($)'
+      const normMap = {};
+      Object.keys(row).forEach((origKey) => {
+        const cleanKey = normalizeKey(origKey);
+        if (cleanKey) {
+          normMap[cleanKey] = row[origKey];
+        }
       });
 
-      // Robust getField which tries candidate names after normalization
-      const getField = (...candidates) => {
-        for (const candidate of candidates) {
-          const candNorm = normalizeKey(candidate);
-          if (candNorm && Object.prototype.hasOwnProperty.call(norm, candNorm)) return norm[candNorm];
+      // Helper to fetch value from multiple possible header names
+      const getValue = (...candidates) => {
+        for (const c of candidates) {
+          const k = normalizeKey(c);
+          if (normMap[k] !== undefined) return normMap[k];
         }
         return undefined;
       };
 
-      const name = getField('name', 'product name', 'productname');
-      const category = getField('category', 'cat');
-      const brand = getField('brand', 'manufacturer');
-      const description = getField('description', 'desc');
+      // 2. Extract & Normalize Fields
+      // Name & Category (Required later)
+      let name = getValue('name', 'product name', 'productname', 'item');
+      name = name ? String(name).trim() : '';
 
-      // Parse numbers
-      const priceRaw = getField('price', 'cost', 'mrp');
-      const stockRaw = getField('stock', 'instock', 'quantity', 'qty');
+      let category = getValue('category', 'cat', 'type', 'category name');
+      category = category ? String(category).trim() : '';
 
-      const price = parseFloat(typeof priceRaw === 'string' ? priceRaw.replace(/[^0-9.]/g, '') : priceRaw);
-      const inStock = parseInt(stockRaw, 10) || 0;
-
-      // Strict validation as requested
-      if (!name || !category || !brand || isNaN(price)) {
-        // Include detected headers and normalized keys/values for easier debugging
-        const detectedHeaders = Object.keys(prod || {}).slice(0, 20);
-        const normalizedKeys = Object.keys(norm || {}).slice(0, 20);
-        const normalizedValues = {
-          name: norm['name'],
-          category: norm['category'],
-          brand: norm['brand'],
-          price: norm['price']
-        };
-
-        const errObj = {
-          row: i + 1,
-          message: 'Missing required fields (Name, Category, Brand, Price)',
-          detectedHeaders,
-          normalizedKeys,
-          normalizedValues
-        };
-
-        console.warn('Bulk import validation failed for row:', errObj);
-        errors.push(errObj);
-        continue;
+      // Brand: Default to "VaibhavTools"
+      let brand = getValue('brand', 'manufacturer', 'company', 'make');
+      brand = brand ? String(brand).trim() : '';
+      if (!brand) {
+        brand = 'VaibhavTools';
       }
 
-      const productData = {
-        name,
-        category,
-        brand,
-        description: description || '',
-        price,
-        inStock,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
-      };
+      // Price: Default to 1
+      let priceRaw = getValue('price', 'mrp', 'cost', 'amount', 'rate');
+      let price = 1;
+      if (priceRaw !== undefined && priceRaw !== null && priceRaw !== '') {
+        const cleanedPrice = String(priceRaw).replace(/[^0-9.]/g, ''); // Allow '1,200.00' -> '1200.00' if we strip commas? logic below strips everything not digit or dot
+        // Better: replace(/[^0-9.]/g, '') removes commas. So '1,000' becomes '1000' (good).
+        // Check for multiple dots? parseFloat handles '1.2.3' as '1.2' usually.
+        const parsedPrice = parseFloat(cleanedPrice);
+        if (!isNaN(parsedPrice) && parsedPrice >= 0) {
+          price = parsedPrice;
+        }
+      }
 
-      // Add to Firestore
-      await db.collection('products').add(productData);
-      successCount++;
+      // Stock: Default to 0
+      let stockRaw = getValue('stock', 'instock', 'quantity', 'qty', 'count');
+      let inStock = 0;
+      if (stockRaw !== undefined && stockRaw !== null && stockRaw !== '') {
+        const cleanedStock = String(stockRaw).replace(/[^0-9]/g, '');
+        const parsedStock = parseInt(cleanedStock, 10);
+        if (!isNaN(parsedStock) && parsedStock >= 0) {
+          inStock = parsedStock;
+        }
+      }
+
+      // Description
+      let description = getValue('description', 'desc', 'details', 'info');
+      description = description ? String(description).trim() : '';
+
+      // 3. Validation
+      // Only reject if Name or Category is missing
+      if (!name || !category) {
+        skippedCount++;
+        errors.push({
+          row: rowNumber,
+          reason: `Missing required fields: ${!name ? 'Name' : ''} ${!category ? 'Category' : ''}`.trim(),
+          data: row // consistent with debugging needs
+        });
+        continue; // Skip this row
+      }
+
+      // 4. Insert (One by one to allow partial success)
+      try {
+        const productData = {
+          name,
+          category,
+          brand,
+          description,
+          price,
+          inStock,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        };
+
+        await db.collection('products').add(productData);
+        insertedCount++;
+      } catch (insertErr) {
+        console.error(`Row ${rowNumber} insert error:`, insertErr);
+        skippedCount++;
+        errors.push({
+          row: rowNumber,
+          reason: 'Database Error',
+          details: insertErr.message
+        });
+      }
     }
 
-    if (errors.length > 0 && successCount === 0) {
-      console.warn('Bulk import finished with errors and no successful rows. Sample errors:', errors.slice(0, 5));
-    }
+    // 5. Response
+    // Do not fail the request if some rows failed. Only fail 500 on catastrophic script errors.
+    res.json({
+      totalRows: products.length,
+      insertedCount,
+      skippedCount,
+      errors
+    });
 
-    res.json({ successCount, errors });
   } catch (err) {
     console.error('Import error:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: err.message || 'Internal Server Error' });
   } finally {
-    // Clean up temp file
     if (fs.existsSync(filePath)) {
-      try {
-        fs.unlinkSync(filePath);
-      } catch (e) {
-        console.error('Error deleting temp file:', e);
-      }
+      try { fs.unlinkSync(filePath); } catch (e) { /* ignore */ }
     }
   }
 });
