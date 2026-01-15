@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { WrenchIcon, TruckIcon, HandshakeIcon, ShieldCheck, MapPin, BookOpen } from 'lucide-react';
+import { WrenchIcon, TruckIcon, HandshakeIcon } from 'lucide-react';
 import { useT } from '../components/TranslatableText';
 import PromoSection from '../components/PromoSection';
 
@@ -76,10 +76,10 @@ const Home = () => {
               whileInView={{ y: 0, opacity: 1 }}
               viewport={{ once: true }}
               transition={{ duration: 0.8 }}
-              className="text-5xl sm:text-6xl font-bold text-white mb-6"
+              className="text-5xl sm:text-7xl font-bold text-white mb-6"
             >
-              <span className="block">Hackiware</span>
-              <span className="text-primary-red block mt-2 text-2xl sm:text-3xl">Where Cybersecurity Is Experienced — Not Memorized</span>
+              {t("Professional Tools for")}
+              <span className="text-primary-red block mt-2">{t("Every Challenge")}</span>
             </motion.h1>
             <motion.p 
               initial={{ y: 50, opacity: 0 }}
@@ -88,7 +88,7 @@ const Home = () => {
               transition={{ duration: 0.8, delay: 0.2 }}
               className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto"
             >
-              We design immersive, hands-on cybersecurity environments that bridge theory and real-world defense — empowering the next generation of cyber defenders.
+              {t("Quality tools that professionals trust. Built to last, designed to perform.")}
             </motion.p>
             <motion.div
               initial={{ scale: 0.5, opacity: 0 }}
@@ -105,39 +105,6 @@ const Home = () => {
             </motion.div>
           </div>
         </div>
-
-          {/* What We Do Section (3 columns) */}
-          <section className="py-20 px-4 sm:px-6 lg:px-8 bg-black text-white">
-            <div className="max-w-7xl mx-auto text-center">
-              <h2 className="text-4xl font-display mb-8">What We Do</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <div className="bg-dark-gray/40 p-8 rounded-xl border border-gray-800">
-                  <ShieldCheck className="h-10 w-10 text-primary-red mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold mb-2">Hands-On Cybersecurity</h3>
-                  <p className="text-gray-300">We create realistic attack–defense simulations that help learners think like attackers and defend like professionals.</p>
-                </div>
-                <div className="bg-dark-gray/40 p-8 rounded-xl border border-gray-800">
-                  <MapPin className="h-10 w-10 text-primary-red mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold mb-2">National-Level Events</h3>
-                  <p className="text-gray-300">Hackiware organizes cybersecurity workshops, simulations, and competitive events across institutions to promote applied security learning.</p>
-                </div>
-                <div className="bg-dark-gray/40 p-8 rounded-xl border border-gray-800">
-                  <BookOpen className="h-10 w-10 text-primary-red mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold mb-2">Education-First Platform</h3>
-                  <p className="text-gray-300">Our focus is not certificates — it’s capability, depth, and real-world readiness.</p>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* Why Hackiware Exists Narrative */}
-          <section className="py-16 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-black via-charcoal to-dark-gray text-gray-200">
-            <div className="max-w-4xl mx-auto text-center">
-              <h3 className="text-3xl font-display mb-6">Why Hackiware Exists</h3>
-              <p className="mb-4">Traditional cybersecurity education struggles to keep pace with rapidly evolving threats.</p>
-              <p>Hackiware exists to close this gap by replacing passive learning with experiential, scenario-driven security training.</p>
-            </div>
-          </section>
       </div>
 
       {/* Why Choose Us Section */}
@@ -172,7 +139,7 @@ const Home = () => {
             className="text-center mb-20"
           >
             <h2 className="text-5xl font-display text-white uppercase tracking-widest inline-block relative">
-              Why Thousands Trust Hackiware
+              {t("Why Thousands Trust Vaibhav Tools?")}
               <span className="block h-2 w-2/3 mx-auto mt-2 rounded bg-primary-red" />
             </h2>
           </motion.div>

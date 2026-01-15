@@ -66,8 +66,6 @@ function App() {
                 <Route path="/products/:id" element={<ProductDetail />} />
                 <Route path="/cart" element={<Cart />} />
                 <Route path="/contact" element={<Contact />} />
-                {/* Temporary: render Contact at /blog for public launch */}
-                <Route path="/blog" element={<Contact />} />
                 <Route path="/signin" element={<Auth />} />
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/wishlist" element={<Wishlist />} />

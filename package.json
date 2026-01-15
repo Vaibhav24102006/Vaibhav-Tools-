@@ -10,6 +10,7 @@
     "dompurify": "^3.2.6",
     "dotenv": "^17.0.0",
     "express": "^5.1.0",
+    "fast-csv": "^5.0.5",
     "firebase": "^11.10.0",
     "firebase-admin": "^13.5.0",
     "framer-motion": "^12.15.0",
