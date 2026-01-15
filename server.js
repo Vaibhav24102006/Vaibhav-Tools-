@@ -383,35 +383,67 @@ app.post('/api/admin/products/import', authenticateAdmin, upload.single('file'),
     let successCount = 0;
     let errors = [];
 
+    // Helper: normalize header keys so we can match variations (case, whitespace, BOM, punctuation)
+    const normalizeKey = (k = '') => {
+      if (typeof k !== 'string') return '';
+      // Remove BOM, trim, lowercase, collapse whitespace and non-alphanum
+      return k.replace(/^\uFEFF/, '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
+    };
+
     for (let i = 0; i < products.length; i++) {
       const prod = products[i];
 
-      // Normalize field names (handle variations in capitalization from file headers)
-      // We look for keys that match our expected fields case-insensitively
-      const getField = (obj, ...candidates) => {
-        const keys = Object.keys(obj);
+      // Build normalized map for quick, tolerant lookups
+      const norm = {};
+      Object.keys(prod || {}).forEach((origKey) => {
+        const v = prod[origKey];
+        const nk = normalizeKey(origKey);
+        if (nk) norm[nk] = v;
+      });
+
+      // Robust getField which tries candidate names after normalization
+      const getField = (...candidates) => {
         for (const candidate of candidates) {
-          const match = keys.find(k => k.toLowerCase() === candidate.toLowerCase());
-          if (match) return obj[match];
+          const candNorm = normalizeKey(candidate);
+          if (candNorm && Object.prototype.hasOwnProperty.call(norm, candNorm)) return norm[candNorm];
         }
         return undefined;
       };
 
-      const name = getField(prod, 'name', 'product name', 'productname');
-      const category = getField(prod, 'category', 'cat');
-      const brand = getField(prod, 'brand', 'manufacturer');
-      const description = getField(prod, 'description', 'desc');
+      const name = getField('name', 'product name', 'productname');
+      const category = getField('category', 'cat');
+      const brand = getField('brand', 'manufacturer');
+      const description = getField('description', 'desc');
 
       // Parse numbers
-      const priceRaw = getField(prod, 'price', 'cost', 'mrp');
-      const stockRaw = getField(prod, 'stock', 'instock', 'quantity', 'qty');
+      const priceRaw = getField('price', 'cost', 'mrp');
+      const stockRaw = getField('stock', 'instock', 'quantity', 'qty');
 
       const price = parseFloat(typeof priceRaw === 'string' ? priceRaw.replace(/[^0-9.]/g, '') : priceRaw);
       const inStock = parseInt(stockRaw, 10) || 0;
 
       // Strict validation as requested
       if (!name || !category || !brand || isNaN(price)) {
-        errors.push(`Row ${i + 1}: Missing required fields (Name, Category, Brand, Price)`);
+        // Include detected headers and normalized keys/values for easier debugging
+        const detectedHeaders = Object.keys(prod || {}).slice(0, 20);
+        const normalizedKeys = Object.keys(norm || {}).slice(0, 20);
+        const normalizedValues = {
+          name: norm['name'],
+          category: norm['category'],
+          brand: norm['brand'],
+          price: norm['price']
+        };
+
+        const errObj = {
+          row: i + 1,
+          message: 'Missing required fields (Name, Category, Brand, Price)',
+          detectedHeaders,
+          normalizedKeys,
+          normalizedValues
+        };
+
+        console.warn('Bulk import validation failed for row:', errObj);
+        errors.push(errObj);
         continue;
       }
 
@@ -429,6 +461,10 @@ app.post('/api/admin/products/import', authenticateAdmin, upload.single('file'),
       // Add to Firestore
       await db.collection('products').add(productData);
       successCount++;
+    }
+
+    if (errors.length > 0 && successCount === 0) {
+      console.warn('Bulk import finished with errors and no successful rows. Sample errors:', errors.slice(0, 5));
     }
 
     res.json({ successCount, errors });

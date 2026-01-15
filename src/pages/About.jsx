@@ -9,7 +9,6 @@ import {
   SparklesIcon,
   HeartIcon
 } from '@heroicons/react/24/outline';
-import Timeline from '../components/Timeline';
 import '../styles/About.css';
 
 const About = () => {
@@ -73,57 +72,48 @@ const About = () => {
   
   const coreValues = [
     {
+      icon: WrenchScrewdriverIcon,
+      title: t("Quality First"),
+      description: t("We never compromise on the quality of our tools and equipment.")
+    },
+    {
       icon: ShieldCheckIcon,
-      title: "Integrity over shortcuts",
-      description: "We prioritize ethical, transparent approaches in every exercise and engagement."
+      title: t("Trust & Reliability"),
+      description: t("Building lasting relationships through consistent service and support.")
     },
     {
       icon: SparklesIcon,
-      title: "Real-world realism over theory-only learning",
-      description: "Our scenarios emphasize practical skills and applied thinking."
-    },
-    {
-      icon: UserGroupIcon,
-      title: "Community-driven growth",
-      description: "We grow with our community — educators, students, and practitioners together."
+      title: t("Innovation"),
+      description: t("Continuously evolving to meet modern industry demands.")
     },
     {
       icon: HeartIcon,
-      title: "Ethical and responsible security practices",
-      description: "Ethics and responsible disclosure guide every simulation and partnership."
+      title: t("Customer Focus"),
+      description: t("Your success is our priority - we're here to support your journey.")
     }
   ];
 
-  // Timeline data for Hackiware (exact provided data)
-  const journeyData = [
+  const timeline = [
     {
-      title: "2023",
-      content: (
-        <p>
-          Hackiware was founded with a single objective: to bridge the gap between
-          theoretical cybersecurity education and real-world attack–defense
-          thinking.
-        </p>
-      ),
+      year: "1950",
+      title: t("Our Beginning"),
+      description: t("Founded as a small family hardware store")
     },
     {
-      title: "2024",
-      content: (
-        <p>
-          Conducted national-level cybersecurity events, simulations, and hands-on
-          workshops across institutions, promoting applied security learning.
-        </p>
-      ),
+      year: "1975",
+      title: t("Expansion"),
+      description: t("Opened our first manufacturing facility")
     },
     {
-      title: "2025",
-      content: (
-        <p>
-          Expanding into an education-first cybersecurity ecosystem focused on
-          realism, depth, and immersive cyber defense experiences.
-        </p>
-      ),
+      year: "2000",
+      title: t("Digital Evolution"),
+      description: t("Launched our online presence")
     },
+    {
+      year: "2023",
+      title: t("Modern Era"),
+      description: t("Expanded to nationwide distribution")
+    }
   ];
 
   const fadeInUp = {
@@ -155,7 +145,7 @@ const About = () => {
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.8 }}
             >
-              About Hackiware
+              {t("Our Legacy")}
             </motion.h1>
           <motion.p 
             className="text-xl md:text-2xl max-w-3xl mx-auto font-light tracking-wide"
@@ -163,7 +153,7 @@ const About = () => {
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.8, delay: 0.2 }}
             >
-              Building immersive cybersecurity experiences that bridge theory and real-world defense — empowering the next generation of defenders.
+              {t("Building the future of professional tools since 1950")}
             </motion.p>
         </div>
       </motion.section>
@@ -185,12 +175,12 @@ const About = () => {
                 transition={{ duration: 0.8 }}
                 viewport={{ once: true }}
               >
-                <h2 className="text-5xl font-display mb-6 text-primary-red drop-shadow-lg">Our Story</h2>
+                <h2 className="text-5xl font-display mb-6 text-primary-red drop-shadow-lg">{t("Our Story")}</h2>
                 <p className="text-lg leading-relaxed mb-6">
-                  Hackiware was founded to address a critical gap in cybersecurity education. While threats evolve rapidly, learning models often remain static.
+                  {t("Founded in 1950, Vaibhav Tools began as a small family-owned hardware store with a vision to provide premium quality tools to professionals. Through three generations of dedication and expertise, we've grown into one of India's leading tool suppliers.")}
                 </p>
                 <p className="text-lg leading-relaxed">
-                  We believe cybersecurity cannot be mastered through theory alone. It must be experienced — simulated, tested, broken, and rebuilt.
+                  {t("Today, we continue our legacy of excellence, combining traditional values with modern innovation to serve the evolving needs of industry professionals.")}
                 </p>
                 <div className="mt-8 grid grid-cols-2 gap-4">
                   <motion.div 
@@ -233,7 +223,7 @@ const About = () => {
                     
                     <img 
                       src="/images/Gemini_Generated_Image_lwt038lwt038lwt0.png"
-                      alt="Hackiware Workshop - immersive cybersecurity lab showcasing hands-on training environments and realistic attack–defense scenarios" 
+                      alt="Vaibhav Tools Workshop - Professional tool manufacturing facility showcasing our commitment to quality craftsmanship and precision engineering" 
                       className={`object-cover w-full h-full transform hover:scale-105 transition-transform duration-700
                                will-change-transform backface-visibility-hidden transition-opacity duration-500 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
                       style={{
@@ -294,7 +284,7 @@ const About = () => {
             whileInView="animate"
             viewport={{ once: true }}
           >
-            Core Principles
+            {t("Our Core Values")}
           </motion.h2>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
             {coreValues.map((value, index) => (
@@ -322,20 +312,47 @@ const About = () => {
         </div>
       </section>
 
-      {/* Timeline - full width animated component (Hackiware journey data) */}
-      <section className="w-full py-20 bg-black">
-        <div className="relative w-full">
+      {/* Timeline */}
+      <section className="py-20 px-4 relative w-full">
+        <div className="container-width mx-auto">
           <motion.h2 
-            className="text-5xl font-display text-center mb-12 text-primary-red"
+            className="text-5xl font-display text-center mb-16 text-primary-red"
             variants={fadeInUp}
             initial="initial"
             whileInView="animate"
             viewport={{ once: true }}
           >
-            Our Journey
+            {t("Our Journey")}
           </motion.h2>
-          {/* Timeline component is full-bleed and handles its own container */}
-          <Timeline data={journeyData} />
+          <div className="relative">
+            {/* Timeline Line */}
+            <div className="absolute left-1/2 transform -translate-x-1/2 h-full w-1 bg-gradient-to-b from-primary-red via-primary-red to-transparent" />
+            
+            {/* Timeline Events */}
+            {timeline.map((item, index) => (
+              <motion.div
+                key={item.year}
+                className={`flex items-center mb-16 ${
+                  index % 2 === 0 ? 'md:flex-row' : 'md:flex-row-reverse'
+                }`}
+                initial={{ opacity: 0, x: index % 2 === 0 ? -50 : 50 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.5 }}
+                viewport={{ once: true }}
+              >
+                <div className="w-1/2 px-8">
+                  <div className="bg-dark-gray/80 backdrop-blur-sm p-6 rounded-xl border border-gray-800">
+                    <h3 className="text-2xl font-display text-primary-red mb-2">{item.year}</h3>
+                    <h4 className="text-xl font-display mb-2">{item.title}</h4>
+                    <p className="text-gray-400">{item.description}</p>
+                  </div>
+                </div>
+                <div className="w-1/2 flex justify-center">
+                  <div className="w-4 h-4 rounded-full bg-primary-red shadow-lg shadow-primary-red/50" />
+                </div>
+              </motion.div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -382,7 +399,7 @@ const About = () => {
                     }}
                     onError={handleVideoError}
                     onLoadedData={handleVideoLoad}
-                    aria-label="Hackiware promotional video showcasing immersive cybersecurity simulations and training environments"
+                    aria-label="Vaibhav Tools promotional video showcasing our manufacturing excellence and precision tooling"
                     preload="metadata"
                     poster="/images/Gemini_Generated_Image_lwt038lwt038lwt0.png" // Use workshop image as poster
                   >
@@ -391,7 +408,7 @@ const About = () => {
                     
                     {/* Screen reader fallback */}
                     <div className="sr-only">
-                        <p>{t("Background video showing Hackiware immersive cybersecurity simulations and learning environments.")}</p>
+                      <p>{t("Background video showing Vaibhav Tools manufacturing processes and quality craftsmanship.")}</p>
                     </div>
                     
                     {/* Fallback for browsers without video support */}
@@ -476,7 +493,7 @@ const About = () => {
                 transition={{ duration: 0.8, delay: 0.4 }}
                 viewport={{ once: true }}
               >
-                Experience immersive, hands-on cybersecurity training with Hackiware — realistic scenarios, expert-led simulations, and a community-focused approach.
+                {t("Experience the perfect blend of quality, service, and expertise with Vaibhav Tools. Join thousands of satisfied professionals who trust us for their equipment needs.")}
               </motion.p>
               
               <motion.button
@@ -495,9 +512,9 @@ const About = () => {
                   textShadow: '0 1px 2px rgba(0, 0, 0, 0.8)',
                   filter: 'drop-shadow(0 4px 8px rgba(0, 0, 0, 0.6))'
                 }}
-                aria-label={t("Explore Our Programs - Learn about Hackiware offerings")}
+                aria-label={t("Explore Our Collection - Navigate to products page")}
               >
-                Explore Our Programs
+                {t("Explore Our Collection")}
               </motion.button>
             </div>
           </motion.div>
